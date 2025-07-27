@@ -1,5 +1,6 @@
 package org.example.userauthservice.Service;
 
+import org.antlr.v4.runtime.misc.Pair;
 import org.example.userauthservice.Models.User;
 
 public interface IAuthService {
@@ -11,7 +12,7 @@ public interface IAuthService {
             String phoneNumber
     );
 
-    User login(
+    Pair<User,String> login(
             String email,
             String password
     );

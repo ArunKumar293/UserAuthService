@@ -1,12 +1,19 @@
 package org.example.userauthservice.Controller;
 
+import org.antlr.v4.runtime.misc.Pair;
 import org.example.userauthservice.DTO.LoginRequestDTO;
 import org.example.userauthservice.DTO.SignupRequestDTO;
 import org.example.userauthservice.DTO.UserDTO;
 import org.example.userauthservice.DTO.ValidateTokenRequestDTO;
+import org.example.userauthservice.Exception.InvalidTokenException;
 import org.example.userauthservice.Models.User;
 import org.example.userauthservice.Service.IAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +27,7 @@ public class AuthController {
     private IAuthService authService;
 
     @PostMapping("/signup")
-    public UserDTO signup(@RequestBody SignupRequestDTO signupRequestDTO) {
+    public ResponseEntity<UserDTO> signup(@RequestBody SignupRequestDTO signupRequestDTO) {
 
         User user =  authService.signup(
                 signupRequestDTO.getName(),
@@ -29,23 +36,38 @@ public class AuthController {
                 signupRequestDTO.getPhoneNumber()
         );
 
-        return UserToUserDTO(user);
+        UserDTO userDTO = UserToUserDTO(user);
+        return new ResponseEntity<>(userDTO, HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
-    public UserDTO login(@RequestBody LoginRequestDTO loginRequestDTO) {
+    public ResponseEntity<UserDTO> login(@RequestBody LoginRequestDTO loginRequestDTO) {
 
-        User user = authService.login(
+        Pair<User,String> response = authService.login(
                 loginRequestDTO.getEmail(),
                 loginRequestDTO.getPassword()
         );
 
-        return UserToUserDTO(user);
+        User user = response.a;
+        String token = response.b;
+
+        MultiValueMap<String,String> headers = new LinkedMultiValueMap<>();
+        headers.add(HttpHeaders.SET_COOKIE,token);
+
+        UserDTO userDTO  = UserToUserDTO(user);
+        return new ResponseEntity<>(userDTO,headers,HttpStatus.OK);
     }
 
     @PostMapping("/validateToken")
-    public UserDTO validateToken(@RequestBody ValidateTokenRequestDTO validateTokenRequestDTO) {
-        return null;
+    public ResponseEntity<Void> validateToken(@RequestBody ValidateTokenRequestDTO validateTokenRequestDTO) {
+
+        Boolean response = authService.validateToken(validateTokenRequestDTO.getToken(),validateTokenRequestDTO.getUserId());
+
+        if(!response){
+            throw new InvalidTokenException("Invalid Token");
+        }
+
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     public UserDTO UserToUserDTO(User user) {
