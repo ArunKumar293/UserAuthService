@@ -1,9 +1,13 @@
 package org.example.userauthservice.Service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import org.antlr.v4.runtime.misc.Pair;
+import org.example.userauthservice.Client.KafkaProducerClient;
+import org.example.userauthservice.DTO.EmailDTO;
 import org.example.userauthservice.Exception.PasswordMismatchException;
 import org.example.userauthservice.Exception.UserAlreadyExistsException;
 import org.example.userauthservice.Exception.UserNotExistsException;
@@ -36,8 +40,14 @@ public class AuthService implements IAuthService {
     @Autowired
     private SessionRepository sessionRepository;
 
+    @Autowired
+    private KafkaProducerClient kafkaProducerClient;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Override
-    public User signup(String name, String email, String password, String phoneNumber) {
+    public User signup(String name, String email, String password, String phoneNumber){
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isPresent()) {
             throw new UserAlreadyExistsException("User Alreday Present");
@@ -47,6 +57,22 @@ public class AuthService implements IAuthService {
         user.setEmail(email);
         user.setPassword(bCryptPasswordEncoder.encode(password));
         user.setPhoneNumber(phoneNumber);
+
+        try{
+            EmailDTO emailDTO = new EmailDTO();
+            emailDTO.setTo(email);
+            emailDTO.setSubject("User Registration");
+            emailDTO.setBody("This is a user registration");
+            emailDTO.setFrom("arunkumar2932000@gmail.com");
+
+            String message = objectMapper.writeValueAsString(emailDTO);
+
+            kafkaProducerClient.sendMessage("signup",message);
+        }
+        catch(JsonProcessingException e){
+            throw new RuntimeException(e.getMessage());
+        }
+
         return userRepository.save(user);
     }
 
